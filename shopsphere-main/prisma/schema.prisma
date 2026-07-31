@@ -1,0 +1,63 @@
+// Prisma schema for ShopSphere
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// A sellable item in the catalogue.
+model Product {
+  id          String      @id @default(cuid())
+  name        String
+  slug        String      @unique
+  description String
+  priceCents  Int
+  imageUrl    String
+  category    String
+  stock       Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  orderItems  OrderItem[]
+
+  @@index([category])
+}
+
+/// A customer order, created once checkout starts and updated once Stripe confirms payment.
+/// `status` is a plain String (rather than a Prisma enum) because the
+/// `sqlite` connector used for local development does not support native
+/// enums. Valid values are validated in application code — see
+/// `src/types/index.ts` (OrderStatus) and `src/lib/validations.ts`.
+model Order {
+  id                String      @id @default(cuid())
+  customerEmail     String
+  customerName      String
+  status            String      @default("PENDING")
+  totalCents        Int
+  stripeSessionId   String?     @unique
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  items             OrderItem[]
+}
+
+/// A single line item within an order, storing the price at purchase time.
+model OrderItem {
+  id         String  @id @default(cuid())
+  orderId    String
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product @relation(fields: [productId], references: [id])
+  quantity   Int
+  priceCents Int
+}
+
+/// A back-office administrator account.
+model Admin {
+  id           String @id @default(cuid())
+  email        String @unique
+  passwordHash String
+}

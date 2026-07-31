@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DATABASE_URL: 'file:./dev.db'
+  JWT_SECRET: 'ci-test-secret-do-not-use-in-production'
+  STRIPE_SECRET_KEY: 'sk_test_dummy_key_for_ci'
+  NEXT_PUBLIC_BASE_URL: 'http://localhost:3000'
+  ADMIN_EMAIL: 'admin@shopsphere.dev'
+  ADMIN_PASSWORD: 'ChangeMe123!'
+
+jobs:
+  build-and-test:
+    name: Lint, test and build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Sync database schema
+        run: npx prisma db push --skip-generate
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Run unit tests with coverage
+        run: npm test
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          fail_ci_if_error: false
+
+      - name: Build production bundle
+        run: npm run build
